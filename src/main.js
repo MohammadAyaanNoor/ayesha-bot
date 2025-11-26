@@ -1,5 +1,3 @@
-import { VRMLoaderPlugin} from '@pixiv/three-vrm';
-import { VRMAnimationLoaderPlugin } from '@pixiv/three-vrm-animation';
 import * as THREE from 'three';
 import { DRACOLoader, GLTFLoader, Sky } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -16,10 +14,6 @@ const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('../static/draco/')
 gltfLoader.setDRACOLoader(dracoLoader)
-gltfLoader.register((parser)=>{
-  return new VRMLoaderPlugin(parser);
-})
-gltfLoader.register(parser => new VRMAnimationLoaderPlugin(parser));
 
 const sizes ={
   width: window.innerWidth,
@@ -168,7 +162,6 @@ const clock = new THREE.Clock();
 
 function tick(){
   const elapsedTime = clock.getElapsedTime();
-  const delta = clock.getDelta();
   if(model && flag === 0){
     model.rotation.y = Math.cos(elapsedTime) * 2;
     model.position.x = Math.sin(elapsedTime) * 2;
