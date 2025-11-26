@@ -74,7 +74,7 @@ scene.add(plane)
 
 //model
 let model = null
-gltfLoader.load('../static/female_model.glb',(gltf)=>{
+gltfLoader.load('/assets/female_model.glb',(gltf)=>{
   model = gltf.scene;
   scene.add(model);
   model.traverse((object)=>{
