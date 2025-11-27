@@ -1,9 +1,9 @@
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import * as THREE from 'three';
 import { DRACOLoader, GLTFLoader, Sky } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
-
-
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { remapMixamoAnimationToVRM } from './Utils/remapMixamoAnimationToVRM';
 
 
 const canvas = document.querySelector('.webgl');
@@ -12,9 +12,12 @@ const scene = new THREE.Scene();
 
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
+const fbxLoader = new FBXLoader();
 dracoLoader.setDecoderPath('../static/draco/')
 gltfLoader.setDRACOLoader(dracoLoader)
-
+  gltfLoader.register((parser) => {
+    return new VRMLoaderPlugin(parser);
+  });
 const sizes ={
   width: window.innerWidth,
   height: window.innerHeight
@@ -67,27 +70,73 @@ plane.rotation.x = - Math.PI * 0.5;
 scene.add(plane)
 
 //model
-let model = null
-gltfLoader.load('/assets/female_model.glb',(gltf)=>{
-  model = gltf.scene;
-  scene.add(model);
-  model.traverse((object)=>{
+
+let currentAnimationUrl = '/assets/Waving.fbx'
+let currentVrm = undefined
+let currentMixer = undefined
+let currentAction = undefined;
+let vrm
+gltfLoader.load('/assets/Sample_Female.vrm',(gltf)=>{
+   vrm = gltf.userData.vrm;
+   // calling this function greatly improves the performance
+			VRMUtils.removeUnnecessaryVertices( gltf.scene );
+			VRMUtils.combineSkeletons( gltf.scene );
+			VRMUtils.combineMorphs( vrm );
+      if ( currentVrm ) {
+
+				scene.remove( currentVrm.scene );
+
+				VRMUtils.deepDispose( currentVrm.scene );
+
+			}
+      currentVrm = vrm;
+  vrm.scene.rotation.y = Math.PI * 0.5;
+  scene.add(vrm.scene);
+  vrm.scene.traverse((object)=>{
     if(object.isMesh){
       object.castShadow = true;
+      object.frustumCulled = false;
     }
   })
+  currentMixer = new THREE.AnimationMixer( currentVrm.scene );
+  if ( currentAnimationUrl ) {
+
+				loadFBX( currentAnimationUrl );
+
+			}
 })
-let flag = 0;
-window.addEventListener('click',()=>{
-  if(model && flag === 0){
-    model.rotation.y = null;
-    model.rotation.y = null;
-    flag = 1;
+async function loadFBX(animationUrl){
+  currentAnimationUrl = animationUrl
+
+  if(currentMixer){
+    const clip = await remapMixamoAnimationToVRM(currentVrm,animationUrl)
+    const newAction = currentMixer.clipAction(clip)
+    newAction.reset().play()
+
+    if ( currentAction && currentAction !== newAction ) {
+
+			currentAction.crossFadeTo( newAction, 0.5, false );
+
+		}
+
+		currentAction = newAction;
+  }
+}
+let flag1 = 0;
+window.addEventListener('click',async(event)=>{
+  if(flag1 === 0){
+    await loadFBX('/assets/Salsa_Dancing.fbx')
+    flag1 = 1;
   }
   else{
-    flag = 0;
+    await loadFBX('/assets/Waving.fbx')
+    flag1 = 0
   }
+  
 })
+ 
+
+
 let flag2 = 0;
 window.addEventListener('keypress',(event)=>{
   console.log(event)
@@ -159,13 +208,24 @@ updateSky()
 
 
 const clock = new THREE.Clock();
+let previousTime = 0;
 
 function tick(){
   const elapsedTime = clock.getElapsedTime();
-  if(model && flag === 0){
-    model.rotation.y = Math.cos(elapsedTime) * 2;
-    model.position.x = Math.sin(elapsedTime) * 2;
-  }
+  const deltaTime = elapsedTime - previousTime;
+  previousTime = elapsedTime;
+  if ( currentMixer ) {
+
+		// update the animation
+		currentMixer.update( deltaTime );
+
+	}
+
+	if ( currentVrm ) {
+
+		currentVrm.update( deltaTime );
+
+	}
   controls.update();
   renderer.render(scene, camera);
   window.requestAnimationFrame(tick);
